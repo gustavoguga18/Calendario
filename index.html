@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Calendário com compromissos</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #111827;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --primary: #22c55e;
+      --primary-ink: #052e1b;
+      --danger: #ef4444;
+      --accent: #38bdf8;
+      --border: #1f2937;
+      --hover: #0b1224;
+    }
+    * { box-sizing: border-box }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, "Helvetica Neue", Arial, "Noto Sans", "Cantarell", "Fira Sans", "Droid Sans", sans-serif;
+      background: linear-gradient(180deg, #020617, var(--bg));
+      color: var(--text);
+      min-height: 100vh;
+      display: grid;
+      place-items: start center;
+      padding: 24px;
+    }
+    .app {
+      width: min(1100px, 95vw);
+      background: rgba(17, 24, 39, 0.9);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+      overflow: hidden;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, #0b1020, #0e1530);
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+    .title {
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      margin-right: auto;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .title .brand {
+      width: 28px; height: 28px;
+      border-radius: 8px;
+      background: radial-gradient(circle at 30% 30%, #22c55e, #16a34a 40%, #0ea5e9 120%);
+      box-shadow: 0 0 0 2px #0b1224, 0 6px 18px rgba(34,197,94,0.3);
+    }
+    .controls { display: flex; align-items: center; gap: 8px; }
+    button, input, select, textarea {
+      color: var(--text);
+    }
+    .btn {
+      background: #0b1224;
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
+      display: inline-flex; align-items: center; gap: 8px;
+    }
+    .btn:hover { background: var(--hover); border-color: #2b3950; }
+    .btn:active { transform: translateY(1px); }
+    .btn-primary {
+      background: linear-gradient(180deg, #16a34a, #15803d);
+      border: 1px solid #14532d;
+    }
+    .btn-primary:hover { background: linear-gradient(180deg, #22c55e, #16a34a); }
+    .btn-danger {
+      background: linear-gradient(180deg, #ef4444, #dc2626);
+      border: 1px solid #7f1d1d;
+    }
+    .btn-ghost {
+      background: transparent;
+      border: 1px dashed var(--border);
+    }
+    .chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 10px; border-radius: 999px; font-size: 12px;
+      border: 1px solid var(--border); background: #0b1224;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1.2fr 2fr;
+      gap: 0;
+    }
+    .sidebar {
+      border-right: 1px solid var(--border);
+      background: rgba(12, 18, 35, 0.6);
+      min-height: 70vh;
+    }
+    .pane { padding: 16px; }
+    .month-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 8px; margin-bottom: 12px;
+    }
+    .month-label { font-weight: 700; font-size: 20px; }
+    .calendar {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .dow {
+      display: grid; grid-template-columns: repeat(7, 1fr);
+      background: #0b1224; border-bottom: 1px solid var(--border);
+    }
+    .dow div {
+      padding: 10px; text-align: center; font-size: 12px; color: var(--muted);
+      letter-spacing: 0.4px;
+    }
+    .cells {
+      display: grid; grid-template-columns: repeat(7, 1fr);
+    }
+    .day {
+      min-height: 96px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border);
+      padding: 10px; position: relative; background: rgba(9, 14, 28, 0.7);
+      transition: background 0.15s ease;
+    }
+    .day:hover { background: rgba(11, 18, 36, 0.9); cursor: pointer; }
+    .day.inactive { background: rgba(9, 14, 28, 0.35); color: #64748b; }
+    .day.today { outline: 2px solid var(--accent); outline-offset: -2px; }
+    .date {
+      font-size: 13px; color: var(--muted); margin-bottom: 8px; display: flex; justify-content: space-between;
+    }
+    .event {
+      font-size: 12px; background: #0b1224; border: 1px solid #23334d; padding: 6px 8px; border-radius: 8px;
+      margin-bottom: 6px; display: flex; align-items: center; gap: 8px;
+    }
+    .event .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--primary); }
+    .event .title { font-weight: 600; font-size: 12px; margin: 0; }
+    .event .time { color: var(--muted); font-size: 11px; margin-left: auto; }
+    .empty-msg {
+      color: var(--muted); font-size: 12px; font-style: italic;
+    }
+    .list-header {
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;
+    }
+    .search {
+      width: 100%; display: flex; gap: 8px; margin-bottom: 12px;
+    }
+    .input {
+      background: #0b1224; border: 1px solid var(--border); border-radius: 10px;
+      padding: 10px 12px; width: 100%;
+    }
+    .event-list .item {
+      border: 1px solid var(--border); background: rgba(9, 14, 28, 0.7);
+      border-radius: 12px; padding: 10px; margin-bottom: 10px;
+      display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center;
+    }
+    .item .meta { font-size: 12px; color: var(--muted); }
+    .item .title { font-weight: 600; }
+    .tags { display: flex; gap: 6px; flex-wrap: wrap; }
+    .kbd {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px; background: #0b1224; border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px;
+    }
+    .modal {
+      position: fixed; inset: 0; display: none; place-items: center; background: rgba(2,6,23,0.6);
+      backdrop-filter: blur(4px); z-index: 50;
+    }
+    .modal.show { display: grid; }
+    .card {
+      width: min(520px, 92vw);
+      background: #0b1224; border: 1px solid var(--border); border-radius: 16px; padding: 16px;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.45);
+    }
+    .card h3 { margin: 0 0 8px 0; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+    .muted { color: var(--muted); }
+    .footer {
+      border-top: 1px dashed var(--border);
+      padding: 10px 16px;
+      color: var(--muted);
+      font-size: 12px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    @media (max-width: 860px) {
+      .grid { grid-template-columns: 1fr; }
+      .sidebar { border-right: none; border-bottom: 1px solid var(--border); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+    <header>
+      <div class="title">
+        <div class="brand" aria-hidden="true"></div>
+        <span>Calendário</span>
+        <span class="chip" id="todayChip"></span>
+      </div>
+      <div class="controls">
+        <button class="btn" id="prevBtn" title="Mês anterior">◀</button>
+        <button class="btn" id="nextBtn" title="Próximo mês">▶</button>
+        <button class="btn btn-ghost" id="todayBtn" title="Ir para hoje">Hoje</button>
+        <button class="btn btn-primary" id="newEventBtn" title="Novo compromisso">+ Compromisso</button>
+      </div>
+    </header>
+
+    <div class="grid">
+      <aside class="sidebar pane">
+        <div class="month-bar">
+          <div class="month-label" id="monthLabel"></div>
+          <div class="chip" id="eventCountChip"></div>
+        </div>
+        <div class="calendar">
+          <div class="dow">
+            <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>
+          </div>
+          <div class="cells" id="calendarCells"></div>
+        </div>
+      </aside>
+
+      <main class="pane">
+        <div class="list-header">
+          <h3 style="margin:0">Compromissos</h3>
+          <span class="muted">Clique em um dia para adicionar</span>
+        </div>
+        <div class="search">
+          <input class="input" id="searchInput" placeholder="Buscar por título ou tag..." />
+          <button class="btn" id="clearSearchBtn">Limpar</button>
+        </div>
+        <div class="event-list" id="eventList"></div>
+      </main>
+    </div>
+
+    <div class="footer">
+      <div>
+        Dica: pressione <span class="kbd">N</span> para novo compromisso, <span class="kbd">H</span> para ir ao mês atual.
+      </div>
+      <div>
+        Seus dados ficam salvos no navegador (localStorage).
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de evento -->
+  <div class="modal" id="eventModal" aria-hidden="true">
+    <div class="card" role="dialog" aria-modal="true" aria-labelledby="eventTitleLabel">
+      <h3 id="eventTitleLabel">Compromisso</h3>
+      <div class="row" style="margin-bottom:8px">
+        <div>
+          <label class="muted">Título</label>
+          <input class="input" id="evTitle" placeholder="Ex.: Reunião com equipe" />
+        </div>
+        <div>
+          <label class="muted">Tag</label>
+          <input class="input" id="evTag" placeholder="Ex.: trabalho, pessoal" />
+        </div>
+      </div>
+      <div class="row" style="margin-bottom:8px">
+        <div>
+          <label class="muted">Data</label>
+          <input class="input" id="evDate" type="date" />
+        </div>
+        <div>
+          <label class="muted">Horário</label>
+          <input class="input" id="evTime" type="time" />
+        </div>
+      </div>
+      <div>
+        <label class="muted">Descrição</label>
+        <textarea class="input" id="evDesc" rows="3" placeholder="Detalhes"></textarea>
+      </div>
+      <div class="actions">
+        <button class="btn" id="closeModalBtn">Cancelar</button>
+        <button class="btn btn-danger" id="deleteEventBtn" style="display:none">Excluir</button>
+        <button class="btn btn-primary" id="saveEventBtn">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Utilidades
+    const fmtMonthYear = (date) =>
+      date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    const fmtDate = (date) =>
+      date.toISOString().slice(0,10); // YYYY-MM-DD
+    const parseDate = (str) => {
+      const [y,m,d] = str.split('-').map(Number);
+      const dt = new Date(y, m-1, d);
+      return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+    };
+    const isSameDay = (a,b) =>
+      a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+
+    // Armazenamento
+    const STORAGE_KEY = 'cal-events-v1';
+    const loadEvents = () => {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        return raw ? JSON.parse(raw) : [];
+      } catch (e) {
+        console.warn('Falha ao carregar eventos', e);
+        return [];
+      }
+    };
+    const saveEvents = (evts) => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(evts));
+    };
+
+    // Estado
+    let state = {
+      current: new Date(),
+      events: loadEvents(),
+      editingId: null,
+      search: ''
+    };
+
+    // Elementos
+    const monthLabel = document.getElementById('monthLabel');
+    const calendarCells = document.getElementById('calendarCells');
+    const eventList = document.getElementById('eventList');
+    const eventCountChip = document.getElementById('eventCountChip');
+    const todayChip = document.getElementById('todayChip');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const todayBtn = document.getElementById('todayBtn');
+    const newEventBtn = document.getElementById('newEventBtn');
+    const searchInput = document.getElementById('searchInput');
+    const clearSearchBtn = document.getElementById('clearSearchBtn');
+
+    // Modal
+    const modal = document.getElementById('eventModal');
+    const evTitle = document.getElementById('evTitle');
+    const evTag = document.getElementById('evTag');
+    const evDate = document.getElementById('evDate');
+    const evTime = document.getElementById('evTime');
+    const evDesc = document.getElementById('evDesc');
+    const saveEventBtn = document.getElementById('saveEventBtn');
+    const deleteEventBtn = document.getElementById('deleteEventBtn');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+
+    // Renderização
+    function render() {
+      const now = new Date();
+      todayChip.textContent = `Hoje: ${now.toLocaleDateString('pt-BR')}`;
+
+      // Cabeçalho mês
+      monthLabel.textContent = fmtMonthYear(state.current);
+
+      // Grade do calendário
+      calendarCells.innerHTML = '';
+      const year = state.current.getFullYear();
+      const month = state.current.getMonth();
+      const first = new Date(year, month, 1);
+      const last = new Date(year, month + 1, 0);
+      const startIdx = first.getDay(); // 0 dom
+      const daysInMonth = last.getDate();
+
+      const prevMonthDays = new Date(year, month, 0).getDate();
+
+      const totalCells = 42; // 6 semanas x 7 dias para estabilidade visual
+      for (let i = 0; i < totalCells; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'day';
+        let dateNum, cellDate, inactive=false;
+
+        if (i < startIdx) {
+          // dias do mês anterior
+          dateNum = prevMonthDays - startIdx + 1 + i;
+          cellDate = new Date(year, month-1, dateNum);
+          inactive = true;
+        } else if (i >= startIdx + daysInMonth) {
+          // dias do próximo mês
+          dateNum = i - (startIdx + daysInMonth) + 1;
+          cellDate = new Date(year, month+1, dateNum);
+          inactive = true;
+        } else {
+          dateNum = i - startIdx + 1;
+          cellDate = new Date(year, month, dateNum);
+        }
+
+        const isToday = isSameDay(cellDate, now);
+        if (inactive) cell.classList.add('inactive');
+        if (isToday) cell.classList.add('today');
+
+        const dateBar = document.createElement('div');
+        dateBar.className = 'date';
+        dateBar.innerHTML = `<span>${cellDate.getDate()}</span><span>${cellDate.toLocaleDateString('pt-BR', { month: 'short' })}</span>`;
+        cell.appendChild(dateBar);
+
+        // Eventos deste dia
+        const dayEvents = state.events
+          .filter(e => fmtDate(parseDate(e.date)) === fmtDate(cellDate))
+          .sort((a,b) => (a.time||'').localeCompare(b.time||''));
+
+        if (dayEvents.length === 0) {
+          const msg = document.createElement('div');
+          msg.className = 'empty-msg';
+          msg.textContent = 'Sem compromissos';
+          cell.appendChild(msg);
+        } else {
+          dayEvents.forEach(e => {
+            const ev = document.createElement('div');
+            ev.className = 'event';
+            const color = colorForTag(e.tag);
+            ev.innerHTML = `
+              <span class="dot" style="background:${color}"></span>
+              <p class="title">${escapeHTML(e.title || '(Sem título)')}</p>
+              <span class="time">${e.time || ''}</span>
+            `;
+            ev.addEventListener('click', (event) => {
+              event.stopPropagation();
+              openModal(cellDate, e.id);
+            });
+            cell.appendChild(ev);
+          });
+        }
+
+        cell.addEventListener('click', () => openModal(cellDate, null));
+        calendarCells.appendChild(cell);
+      }
+
+      // Contador
+      const monthEventsCount = state.events.filter(e => {
+        const d = parseDate(e.date);
+        return d.getFullYear()===year && d.getMonth()===month;
+      }).length;
+      eventCountChip.textContent = `${monthEventsCount} no mês`;
+
+      // Lista geral (com busca)
+      renderEventList();
+    }
+
+    function renderEventList() {
+      const q = state.search.trim().toLowerCase();
+      const filtered = state.events
+        .filter(e => {
+          if (!q) return true;
+          const hay = `${e.title||''} ${e.tag||''} ${e.desc||''}`.toLowerCase();
+          return hay.includes(q);
+        })
+        .sort((a,b) => {
+          const dA = parseDate(a.date);
+          const dB = parseDate(b.date);
+          const tA = a.time || '';
+          const tB = b.time || '';
+          if (dA - dB !== 0) return dA - dB;
+          return tA.localeCompare(tB);
+        });
+
+      eventList.innerHTML = '';
+      if (filtered.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'empty-msg';
+        empty.textContent = q ? 'Nenhum resultado na busca' : 'Sem compromissos';
+        eventList.appendChild(empty);
+        return;
+      }
+
+      filtered.forEach(e => {
+        const item = document.createElement('div');
+        item.className = 'item';
+        const color = colorForTag(e.tag);
+
+        const left = document.createElement('div');
+        left.innerHTML = `
+          <div class="title">${escapeHTML(e.title || '(Sem título)')}</div>
+          <div class="meta">${new Date(e.date).toLocaleDateString('pt-BR')} ${e.time ? '• ' + e.time : ''}</div>
+          <div class="tags">
+            <span class="chip" style="border-color:${color}; color:${color}">#${escapeHTML((e.tag||'').trim() || 'geral')}</span>
+          </div>
+          <div class="muted" style="margin-top:6px">${escapeHTML(e.desc||'')}</div>
+        `;
+
+        const right = document.createElement('div');
+        const editBtn = document.createElement('button');
+        editBtn.className = 'btn';
+        editBtn.textContent = 'Editar';
+        editBtn.addEventListener('click', () => {
+          openModal(parseDate(e.date), e.id);
+        });
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'btn btn-danger';
+        delBtn.textContent = 'Excluir';
+        delBtn.addEventListener('click', () => {
+          if (confirm('Excluir este compromisso?')) {
+            state.events = state.events.filter(x => x.id !== e.id);
+            saveEvents(state.events);
+            render();
+          }
+        });
+
+        right.appendChild(editBtn);
+        right.appendChild(delBtn);
+
+        item.appendChild(left);
+        item.appendChild(right);
+        eventList.appendChild(item);
+      });
+    }
+
+    // Modal
+    function openModal(date, id) {
+      modal.classList.add('show');
+      modal.setAttribute('aria-hidden', 'false');
+      const editing = id != null ? state.events.find(e => e.id === id) : null;
+      state.editingId = editing ? editing.id : null;
+
+      if (editing) {
+        evTitle.value = editing.title || '';
+        evTag.value = editing.tag || '';
+        evDate.value = editing.date || fmtDate(date);
+        evTime.value = editing.time || '';
+        evDesc.value = editing.desc || '';
+        deleteEventBtn.style.display = 'inline-flex';
+      } else {
+        evTitle.value = '';
+        evTag.value = '';
+        evDate.value = fmtDate(date);
+        evTime.value = '';
+        evDesc.value = '';
+        deleteEventBtn.style.display = 'none';
+      }
+      evTitle.focus();
+    }
+
+    function closeModal() {
+      modal.classList.remove('show');
+      modal.setAttribute('aria-hidden', 'true');
+      state.editingId = null;
+    }
+
+    function saveEvent() {
+      const data = {
+        id: state.editingId ?? cryptoRandomId(),
+        title: evTitle.value.trim(),
+        tag: evTag.value.trim(),
+        date: evDate.value,
+        time: evTime.value,
+        desc: evDesc.value.trim()
+      };
+
+      if (!data.date) {
+        alert('Selecione uma data.');
+        evDate.focus();
+        return;
+      }
+
+      if (state.editingId) {
+        state.events = state.events.map(e => e.id === state.editingId ? data : e);
+      } else {
+        state.events.push(data);
+      }
+      saveEvents(state.events);
+      closeModal();
+      render();
+    }
+
+    function deleteEvent() {
+      if (!state.editingId) return;
+      if (confirm('Excluir este compromisso?')) {
+        state.events = state.events.filter(e => e.id !== state.editingId);
+        saveEvents(state.events);
+        closeModal();
+        render();
+      }
+    }
+
+    // Helpers
+    function cryptoRandomId() {
+      if (window.crypto && crypto.getRandomValues) {
+        const buf = new Uint32Array(4);
+        crypto.getRandomValues(buf);
+        return [...buf].map(n => n.toString(16).padStart(8,'0')).join('');
+      }
+      return Math.random().toString(36).slice(2) + Date.now().toString(36);
+    }
+    function colorForTag(tag) {
+      const t = (tag || '').trim().toLowerCase();
+      if (!t) return '#22c55e';
+      const map = {
+        trabalho: '#22c55e',
+        pessoal: '#38bdf8',
+        estudo: '#a78bfa',
+        saúde: '#f97316',
+        família: '#f43f5e',
+        projeto: '#eab308',
+      };
+      return map[t] || '#22c55e';
+    }
+    function escapeHTML(str) {
+      return String(str).replace(/[&<>"']/g, s => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      })[s]);
+    }
+
+    // Eventos UI
+    prevBtn.addEventListener('click', () => {
+      state.current = new Date(state.current.getFullYear(), state.current.getMonth() - 1, 1);
+      render();
+    });
+    nextBtn.addEventListener('click', () => {
+      state.current = new Date(state.current.getFullYear(), state.current.getMonth() + 1, 1);
+      render();
+    });
+    todayBtn.addEventListener('click', () => {
+      state.current = new Date();
+      state.current = new Date(state.current.getFullYear(), state.current.getMonth(), 1);
+      render();
+    });
+    newEventBtn.addEventListener('click', () => {
+      openModal(new Date(), null);
+    });
+    saveEventBtn.addEventListener('click', saveEvent);
+    deleteEventBtn.addEventListener('click', deleteEvent);
+    closeModalBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeModal();
+      if (e.key.toLowerCase() === 'n') openModal(new Date(), null);
+      if (e.key.toLowerCase() === 'h') {
+        state.current = new Date();
+        state.current = new Date(state.current.getFullYear(), state.current.getMonth(), 1);
+        render();
+      }
+    });
+    searchInput.addEventListener('input', () => {
+      state.search = searchInput.value;
+      renderEventList();
+    });
+    clearSearchBtn.addEventListener('click', () => {
+      searchInput.value = '';
+      state.search = '';
+      renderEventList();
+    });
+
+    // Inicialização
+    (function init() {
+      const now = new Date();
+      state.current = new Date(now.getFullYear(), now.getMonth(), 1);
+      render();
+    })();
+  </script>
+</body>
+</html>
