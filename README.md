@@ -14,3 +14,8 @@ Projeto de calendário desenvolvido com HTML, CSS e JavaScript.
 1. Clone o repositório:
    ```bash
    git clone https://github.com/gustavoguga18/Calendario.git
+
+## Estrutura do projeto
+
+- `index.html` — estrutura principal da aplicação
+- `README.md` — documentação do projeto
